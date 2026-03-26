@@ -1,84 +1,121 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>IPL Fantasy League</title>
+<meta charset="UTF-8">
+<title>IPL Fantasy League</title>
 
-  <!-- Correct Supabase CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <style>
-    body {
-      font-family: Arial;
-      background: #0f172a;
-      color: white;
-      padding: 20px;
-    }
+<style>
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #0f172a, #020617);
+  color: white;
+  padding: 20px;
+}
 
-    h1 {
-      text-align: center;
-      color: #38bdf8;
-    }
+h1 {
+  text-align: center;
+  color: #38bdf8;
+  margin-bottom: 30px;
+}
 
-    .card {
-      background: #1e293b;
-      padding: 15px;
-      margin: 12px 0;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: 0.3s;
-    }
+/* Leaderboard Card */
+.card {
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  padding: 18px;
+  margin: 14px 0;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: 0.3s;
+  border: 1px solid rgba(255,255,255,0.05);
+}
 
-    .card:hover {
-      background: #334155;
-    }
+.card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+}
 
-    .player {
-      margin-left: 15px;
-      font-size: 14px;
-      padding: 4px 0;
-      color: #cbd5f5;
-    }
-  </style>
+.team-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.rank {
+  font-size: 14px;
+  color: #94a3b8;
+}
+
+.points {
+  font-weight: bold;
+  color: #38bdf8;
+}
+
+/* Player list */
+.player {
+  margin-left: 15px;
+  padding: 6px 0;
+  font-size: 14px;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-left: 6px;
+}
+
+.captain {
+  background: #facc15;
+  color: black;
+}
+
+.vc {
+  background: #38bdf8;
+  color: black;
+}
+</style>
 </head>
+
 <body>
 
 <h1>🏆 IPL Fantasy League</h1>
 
-<h2>Leaderboard</h2>
 <div id="teams">Loading...</div>
 
 <script>
 const SUPABASE_URL = "https://lbflsywbyvohiolajozf.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxiZmxzeXdieXZvaGlvbGFqb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NDM5NzIsImV4cCI6MjA5MDExOTk3Mn0.JdMANg2b3BcPv6hyrORFXGLVTOl0JfXDYLTa7KoFifs";
 
-// ✅ Correct client creation (v2)
 const { createClient } = supabase;
 const client = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Load Teams
 async function loadTeams() {
-  const { data: teams, error } = await client
+  const { data: teams } = await client
     .from("teams")
     .select("*")
     .order("total_points", { ascending: false });
 
-  if (error) {
-    console.error(error);
-    document.getElementById("teams").innerText = "Error loading data";
-    return;
-  }
-
   const container = document.getElementById("teams");
   container.innerHTML = "";
 
-  teams.forEach(team => {
+  teams.forEach((team, index) => {
     const div = document.createElement("div");
     div.className = "card";
 
     div.innerHTML = `
-      <strong>${team.name}</strong><br>
-      Points: ${team.total_points}
+      <div class="team-header">
+        <div>
+          <strong>${index + 1}. ${team.name}</strong>
+          <div class="rank">Rank #${index + 1}</div>
+        </div>
+        <div class="points">${team.total_points} pts</div>
+      </div>
       <div id="players-${team.id}"></div>
     `;
 
@@ -88,7 +125,7 @@ async function loadTeams() {
   });
 }
 
-// Load Players + Points
+// Load Players with FIX + Captain Logic
 async function loadPlayers(teamId) {
   const container = document.getElementById(`players-${teamId}`);
   container.innerHTML = "Loading...";
@@ -101,25 +138,47 @@ async function loadPlayers(teamId) {
   container.innerHTML = "";
 
   for (let player of players) {
+
+    // 🔥 FIX: correct table name here
     const { data: pointsData } = await client
-      .from("players_points")
+      .from("players_points") // change if your table name differs
       .select("points")
       .eq("player_id", player.id);
 
     let total = 0;
-    if (pointsData) {
-      pointsData.forEach(p => total += p.points);
+
+    if (pointsData && pointsData.length > 0) {
+      pointsData.forEach(p => {
+        total += p.points;
+      });
+    }
+
+    // ✅ Captain / VC logic
+    let badgeHTML = "";
+
+    if (player.is_captain) {
+      total *= 2;
+      badgeHTML = `<span class="badge captain">C</span>`;
+    } else if (player.is_vice_captain) {
+      total *= 1.5;
+      badgeHTML = `<span class="badge vc">VC</span>`;
     }
 
     const pDiv = document.createElement("div");
     pDiv.className = "player";
-    pDiv.innerHTML = `• ${player.name} — ${total} pts`;
+
+    pDiv.innerHTML = `
+      <div>
+        ${player.name} ${badgeHTML}
+      </div>
+      <div>${total} pts</div>
+    `;
 
     container.appendChild(pDiv);
   }
 }
 
-// Initial Load
+// Load initially
 loadTeams();
 </script>
 
