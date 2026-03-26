@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>IPL Fantasy League</title>
+
+  <!-- Correct Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body {
+      font-family: Arial;
+      background: #0f172a;
+      color: white;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #38bdf8;
+    }
+
+    .card {
+      background: #1e293b;
+      padding: 15px;
+      margin: 12px 0;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    .card:hover {
+      background: #334155;
+    }
+
+    .player {
+      margin-left: 15px;
+      font-size: 14px;
+      padding: 4px 0;
+      color: #cbd5f5;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🏆 IPL Fantasy League</h1>
+
+<h2>Leaderboard</h2>
+<div id="teams">Loading...</div>
+
+<script>
+const SUPABASE_URL = "https://lbflsywbyvohiolajozf.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxiZmxzeXdieXZvaGlvbGFqb3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NDM5NzIsImV4cCI6MjA5MDExOTk3Mn0.JdMANg2b3BcPv6hyrORFXGLVTOl0JfXDYLTa7KoFifs";
+
+// ✅ Correct client creation (v2)
+const { createClient } = supabase;
+const client = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Load Teams
+async function loadTeams() {
+  const { data: teams, error } = await client
+    .from("teams")
+    .select("*")
+    .order("total_points", { ascending: false });
+
+  if (error) {
+    console.error(error);
+    document.getElementById("teams").innerText = "Error loading data";
+    return;
+  }
+
+  const container = document.getElementById("teams");
+  container.innerHTML = "";
+
+  teams.forEach(team => {
+    const div = document.createElement("div");
+    div.className = "card";
+
+    div.innerHTML = `
+      <strong>${team.name}</strong><br>
+      Points: ${team.total_points}
+      <div id="players-${team.id}"></div>
+    `;
+
+    div.onclick = () => loadPlayers(team.id);
+
+    container.appendChild(div);
+  });
+}
+
+// Load Players + Points
+async function loadPlayers(teamId) {
+  const container = document.getElementById(`players-${teamId}`);
+  container.innerHTML = "Loading...";
+
+  const { data: players } = await client
+    .from("players")
+    .select("*")
+    .eq("team_id", teamId);
+
+  container.innerHTML = "";
+
+  for (let player of players) {
+    const { data: pointsData } = await client
+      .from("players_points")
+      .select("points")
+      .eq("player_id", player.id);
+
+    let total = 0;
+    if (pointsData) {
+      pointsData.forEach(p => total += p.points);
+    }
+
+    const pDiv = document.createElement("div");
+    pDiv.className = "player";
+    pDiv.innerHTML = `• ${player.name} — ${total} pts`;
+
+    container.appendChild(pDiv);
+  }
+}
+
+// Initial Load
+loadTeams();
+</script>
+
+</body>
+</html>
